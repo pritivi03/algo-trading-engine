@@ -1,0 +1,7 @@
+[project]
+name = "algo-trading-engine"
+version = "0.1.0"
+description = "Event-driven backtesting and paper trading platform with FastAPI control plane and React dashboard"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
