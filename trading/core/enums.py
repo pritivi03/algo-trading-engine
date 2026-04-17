@@ -2,7 +2,7 @@ from enum import Enum
 
 class RunMode(str, Enum):
     BACKTEST = 'backtest'
-    paper = 'paper'
+    live = 'live'
 
 class Side(str, Enum):
     BUY = 'buy'
@@ -19,6 +19,5 @@ class OrderStatus(str, Enum):
     REJECTED = 'rejected'
 
 class MarketDataSource(str, Enum):
-    csv = 'csv'
-    parquet = 'parquet'
-    broker = 'broker'
+    historical = 'historical'
+    live = 'live'

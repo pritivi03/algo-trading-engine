@@ -28,17 +28,15 @@ async def health():
         strategy_params={},
         risk_config=RiskConfig(max_pos_size=0, max_notional_per_trade=0),
         market_data_config=MarketDataConfig(
-            source=MarketDataSource.csv,
+            source=MarketDataSource.historical,
             start_date=datetime.strptime("2021-07-01", "%Y-%m-%d"),
-            end_date=datetime.strptime("2021-08-01", "%Y-%m-%d"),
+            end_date=datetime.strptime("2021-10-01", "%Y-%m-%d"),
         )
     )
     market_data_adapter = HistoricalMarketDataAdapter(credential_store, run_config = run_config)
     bars = []
     for bar in market_data_adapter.stream:
         bars.append(bar)
-        if len(bars) >= 2000:
-            break
     return {"status": bars}
 
 if __name__ == "__main__":

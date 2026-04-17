@@ -5,7 +5,6 @@ description = "Event-driven backtesting and paper trading platform with FastAPI 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alpaca>=1.0.0",
     "alpaca-py>=0.43.2",
     "fastapi>=0.115",
     "pydantic>=2.13.1",

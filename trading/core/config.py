@@ -15,7 +15,6 @@ class RiskConfig(BaseModel):
 
 class MarketDataConfig(BaseModel):
     source: MarketDataSource
-    file_path: str | None = None
     start_date: date | None = None
     end_date: date | None = None
 
