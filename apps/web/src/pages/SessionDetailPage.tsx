@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+} from "recharts";
 import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
 import type { RunStatus } from "../api/types";
@@ -50,6 +53,12 @@ export default function SessionDetailPage() {
     queryKey: ["fills", id],
     queryFn: () => api.runs.fills(id!),
     enabled: tab === "fills",
+  });
+
+  const { data: equitySnapshots } = useQuery({
+    queryKey: ["equity", id],
+    queryFn: () => api.runs.equitySnapshots(id!),
+    enabled: run?.status === "completed",
   });
 
   if (!run) return <p className="text-gray-500 text-sm">Loading…</p>;
@@ -115,6 +124,16 @@ export default function SessionDetailPage() {
         <>
           {run.status === "completed" && metrics ? (
             <div className="space-y-5">
+              {equitySnapshots && equitySnapshots.length > 0 && (
+                <EquityChart
+                  data={equitySnapshots.map((s) => ({
+                    t: new Date(s.timestamp).getTime(),
+                    equity: s.equity,
+                    cash: s.cash,
+                  }))}
+                  initialCapital={run.config.initial_capital}
+                />
+              )}
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Final Portfolio</p>
                 <div className="grid grid-cols-4 gap-3">
@@ -143,6 +162,27 @@ export default function SessionDetailPage() {
             <p className="text-gray-500 text-sm">No metrics available.</p>
           )}
         </>
+      )}
+
+      {tab === "equity" && (
+        <div>
+          {!equitySnapshots ? (
+            <p className="text-gray-500 text-sm">Loading chart…</p>
+          ) : equitySnapshots.length === 0 ? (
+            <p className="text-gray-500 text-sm">No equity data recorded.</p>
+          ) : (
+            <div className="space-y-6">
+              <EquityChart
+                data={equitySnapshots.map((s) => ({
+                  t: new Date(s.timestamp).getTime(),
+                  equity: s.equity,
+                  cash: s.cash,
+                }))}
+                initialCapital={run.config.initial_capital}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "fills" && (
@@ -181,6 +221,73 @@ export default function SessionDetailPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function EquityChart({
+  data,
+  initialCapital,
+}: {
+  data: { t: number; equity: number; cash: number }[];
+  initialCapital: number;
+}) {
+  const finalEquity = data[data.length - 1]?.equity ?? initialCapital;
+  const isPositive = finalEquity >= initialCapital;
+  const color = isPositive ? "#34d399" : "#f87171";
+
+  const fmtDate = (ts: number) =>
+    new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  const fmtDollar = (v: number) =>
+    `$${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+      <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Equity Curve</p>
+      <ResponsiveContainer width="100%" height={320}>
+        <AreaChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+          <defs>
+            <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+          <XAxis
+            dataKey="t"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            scale="time"
+            tickFormatter={fmtDate}
+            tick={{ fill: "#6b7280", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={60}
+          />
+          <YAxis
+            tickFormatter={fmtDollar}
+            tick={{ fill: "#6b7280", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            width={80}
+          />
+          <Tooltip
+            contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: 6 }}
+            labelFormatter={(ts) => new Date(ts as number).toLocaleString()}
+            formatter={(val: number, name: string) => [fmtDollar(val), name === "equity" ? "Equity" : "Cash"]}
+          />
+          <Area
+            type="monotone"
+            dataKey="equity"
+            stroke={color}
+            strokeWidth={1.5}
+            fill="url(#equityGrad)"
+            dot={false}
+            activeDot={{ r: 3, fill: color }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

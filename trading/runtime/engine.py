@@ -1,4 +1,5 @@
 from collections import deque
+from datetime import datetime
 from typing import Tuple
 
 from trading.core.config import RunConfig
@@ -14,6 +15,9 @@ from trading.portfolio.tracker import PortfolioTracker
 from trading.risk.manager import RiskManager
 from trading.strategies.base import BaseStrategy
 
+EquitySnapshot = tuple[datetime, float, float]  # (timestamp, equity, cash)
+
+
 class TradingEngine:
     def __init__(self,
                config: RunConfig,
@@ -28,7 +32,8 @@ class TradingEngine:
         self.risk = risk
         self.portfolio = PortfolioTracker(config.initial_capital)
         self.metrics = MetricsEngine(config.initial_capital)
-        self.fills_buffer: list[FillEvent] = []  # only used in backtest mode
+        self.fills_buffer: list[FillEvent] = []
+        self.snapshots_buffer: list[EquitySnapshot] = []
 
     def _persist_fill_live(self, fill: FillEvent) -> None:
         with get_session() as session:
@@ -40,7 +45,7 @@ class TradingEngine:
         with get_session() as session:
             FillRepository(session).save_fills_batch(self.run_config.run_id, self.fills_buffer)
 
-    def run(self) -> Tuple[PortfolioState, RunMetrics]:
+    def run(self) -> Tuple[PortfolioState, RunMetrics, list[EquitySnapshot]]:
         queue: deque = deque()
         is_backtest = self.run_config.mode == RunMode.BACKTEST
 
@@ -70,11 +75,13 @@ class TradingEngine:
                     else:
                         self._persist_fill_live(event)
 
-            self.metrics.on_bar(self.portfolio.portfolio.equity)
+            state = self.portfolio.snapshot()
+            self.metrics.on_bar(state.equity)
+            self.snapshots_buffer.append((market_event.timestamp, state.equity, state.cash))
 
         if is_backtest:
             self._persist_fills_batch()
 
         final_state = self.portfolio.snapshot()
-        return final_state, self.metrics.summary(final_state.equity)
+        return final_state, self.metrics.summary(final_state.equity), self.snapshots_buffer
 

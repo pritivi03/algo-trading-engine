@@ -1,4 +1,4 @@
-import type { Strategy, Run, Metrics, Fill, CreateRunPayload } from "./types";
+import type { Strategy, Run, Metrics, Fill, EquitySnapshot, CreateRunPayload } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -8,6 +8,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${text}`);
+  }
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
   }
   return res.json() as Promise<T>;
 }
@@ -30,5 +33,6 @@ export const api = {
       request<void>(`/runs/${id}`, { method: "DELETE" }),
     metrics: (id: string) => request<Metrics>(`/runs/${id}/metrics`),
     fills: (id: string) => request<Fill[]>(`/runs/${id}/fills`),
+    equitySnapshots: (id: string) => request<EquitySnapshot[]>(`/runs/${id}/equity-snapshots`),
   },
 };

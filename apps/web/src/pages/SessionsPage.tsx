@@ -22,6 +22,7 @@ function DeleteButton({ run, strategyMap }: { run: Run; strategyMap: Map<string,
     <button
       onClick={(e) => {
         e.stopPropagation();
+        if (!window.confirm("Delete this session? This cannot be undone.")) return;
         mutation.mutate();
       }}
       disabled={mutation.isPending}

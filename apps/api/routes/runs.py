@@ -3,12 +3,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
-from apps.api.schemas.runs import CreateRunRequest, RunResponse, MetricsResponse, FillResponse
+from apps.api.schemas.runs import CreateRunRequest, RunResponse, MetricsResponse, FillResponse, EquitySnapshotResponse
 from apps.api.services import launcher
 from trading.core.config import RunConfig
 from trading.persistence.db import get_session
 from trading.persistence.orm_models import StrategyRunRow, FillRow, RunMetricsRow
-from trading.persistence.repositories import RunRepository, MetricsRepository, FillRepository
+from trading.persistence.repositories import RunRepository, MetricsRepository, FillRepository, EquitySnapshotRepository
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -103,6 +103,13 @@ def list_fills(run_id: UUID) -> list[FillResponse]:
     with get_session() as session:
         rows = FillRepository(session).get_by_run(run_id)
         return [_to_fill_response(r) for r in rows]
+
+@router.get("/{run_id}/equity-snapshots", response_model=list[EquitySnapshotResponse])
+def list_equity_snapshots(run_id: UUID) -> list[EquitySnapshotResponse]:
+    with get_session() as session:
+        rows = EquitySnapshotRepository(session).get_by_run(run_id)
+        return [EquitySnapshotResponse(timestamp=r.timestamp, equity=r.equity, cash=r.cash) for r in rows]
+
 
 @router.post("/{run_id}/start", response_model=RunResponse)
 def start_run(run_id: UUID) -> RunResponse:

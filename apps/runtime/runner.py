@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from apps.runtime.factory import build_engine
 from credentials.credential_store import CredentialStore
 from trading.persistence.db import get_session
-from trading.persistence.repositories import RunRepository, MetricsRepository
+from trading.persistence.repositories import RunRepository, MetricsRepository, EquitySnapshotRepository
 
 load_dotenv()
 
@@ -26,10 +26,11 @@ def main():
 
     try:
         engine = build_engine(creds, config)
-        final_state, metrics = engine.run()
+        final_state, metrics, snapshots = engine.run()
 
         with get_session() as session:
             MetricsRepository(session).save_metrics(run_id, metrics, final_state)
+            EquitySnapshotRepository(session).save_batch(run_id, snapshots)
             RunRepository(session).mark_completed(run_id)
     except Exception:
         error_text = traceback.format_exc()

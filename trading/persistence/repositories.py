@@ -7,7 +7,7 @@ from trading.core.config import RunConfig
 from trading.core.events import FillEvent
 from trading.core.models import PortfolioState
 from trading.metrics.engine import RunMetrics
-from trading.persistence.orm_models import StrategyRunRow, FillRow, RunMetricsRow, StrategyRow
+from trading.persistence.orm_models import StrategyRunRow, FillRow, RunMetricsRow, StrategyRow, EquitySnapshotRow
 
 
 class StrategyRepository:
@@ -144,3 +144,29 @@ class MetricsRepository:
 
     def get(self, run_id: UUID) -> RunMetricsRow | None:
         return self.session.get(RunMetricsRow, run_id)
+
+
+class EquitySnapshotRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def save_batch(self, run_id: UUID, snapshots: list[tuple[datetime, float, float]]) -> None:
+        self.session.add_all([
+            EquitySnapshotRow(run_id=run_id, timestamp=ts, equity=eq, cash=cash)
+            for ts, eq, cash in snapshots
+        ])
+
+    def get_by_run(self, run_id: UUID, max_points: int = 500) -> list[EquitySnapshotRow]:
+        total = (
+            self.session.query(EquitySnapshotRow)
+            .filter(EquitySnapshotRow.run_id == run_id)
+            .count()
+        )
+        step = max(1, total // max_points)
+        return (
+            self.session.query(EquitySnapshotRow)
+            .filter(EquitySnapshotRow.run_id == run_id)
+            .order_by(EquitySnapshotRow.timestamp)
+            .filter(EquitySnapshotRow.id % step == 0)
+            .all()
+        )

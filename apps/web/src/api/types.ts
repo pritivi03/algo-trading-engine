@@ -61,6 +61,12 @@ export interface Fill {
   timestamp: string;
 }
 
+export interface EquitySnapshot {
+  timestamp: string;
+  equity: number;
+  cash: number;
+}
+
 export interface CreateRunPayload {
   strategy_id: string;
   symbol: string;

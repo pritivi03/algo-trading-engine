@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import String, Float, Integer, DateTime, Enum as SAEnum, ForeignKey
+from sqlalchemy import String, Float, Integer, BigInteger, DateTime, Enum as SAEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -48,6 +48,16 @@ class FillRow(Base):
     fill_price: Mapped[float] = mapped_column(Float, nullable=False)
     fees: Mapped[float] = mapped_column(Float, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class EquitySnapshotRow(Base):
+    __tablename__ = "equity_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("strategy_runs.id"), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    equity: Mapped[float] = mapped_column(Float, nullable=False)
+    cash: Mapped[float] = mapped_column(Float, nullable=False)
 
 
 class RunMetricsRow(Base):

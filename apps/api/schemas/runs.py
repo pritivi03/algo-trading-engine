@@ -55,3 +55,9 @@ class FillResponse(BaseModel):
     fill_price: float
     fees: float
     timestamp: datetime
+
+
+class EquitySnapshotResponse(BaseModel):
+    timestamp: datetime
+    equity: float
+    cash: float
