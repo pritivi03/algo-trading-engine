@@ -157,6 +157,14 @@ class EquitySnapshotRepository:
     def __init__(self, session: Session):
         self.session = session
 
+    def get_latest(self, run_id: UUID) -> EquitySnapshotRow | None:
+        return (
+            self.session.query(EquitySnapshotRow)
+            .filter(EquitySnapshotRow.run_id == run_id)
+            .order_by(EquitySnapshotRow.timestamp.desc())
+            .first()
+        )
+
     def save_one(self, run_id: UUID, timestamp: datetime, equity: float, cash: float) -> None:
         self.session.add(EquitySnapshotRow(run_id=run_id, timestamp=timestamp, equity=equity, cash=cash))
 

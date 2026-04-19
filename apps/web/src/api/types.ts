@@ -18,6 +18,7 @@ export interface Run {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  current_equity: number | null;
 }
 
 export interface RunConfig {
@@ -66,6 +67,11 @@ export interface Fill {
 export interface EquitySnapshot {
   timestamp: string;
   equity: number;
+  cash: number;
+}
+
+export interface AccountBalance {
+  portfolio_value: number;
   cash: number;
 }
 

@@ -2,13 +2,14 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
-from apps.api.routes import runs, strategies
+from apps.api.routes import account, runs, strategies
 
 load_dotenv()
 
 app = FastAPI(title="Algo Trading Engine")
 app.include_router(strategies.router)
 app.include_router(runs.router)
+app.include_router(account.router)
 
 
 @app.get("/health")

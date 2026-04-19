@@ -13,7 +13,7 @@ from trading.persistence.repositories import RunRepository, MetricsRepository, F
 router = APIRouter(prefix="/runs", tags=["runs"])
 
 
-def _to_response(row: StrategyRunRow) -> RunResponse:
+def _to_response(row: StrategyRunRow, current_equity: float | None = None) -> RunResponse:
     return RunResponse(
         id=row.id,
         strategy_id=row.strategy_id,
@@ -24,6 +24,7 @@ def _to_response(row: StrategyRunRow) -> RunResponse:
         created_at=row.created_at,
         started_at=row.started_at,
         completed_at=row.completed_at,
+        current_equity=current_equity,
     )
 
 
@@ -57,11 +58,21 @@ def _to_fill_response(row: FillRow) -> FillResponse:
         timestamp=row.timestamp,
     )
 
+def _equity_for_row(session, row: StrategyRunRow) -> float | None:
+    if row.status == "running":
+        snapshot = EquitySnapshotRepository(session).get_latest(row.id)
+        return snapshot.equity if snapshot else None
+    if row.status == "completed":
+        metrics = MetricsRepository(session).get(row.id)
+        return metrics.final_equity if metrics else None
+    return None
+
+
 @router.get("", response_model=list[RunResponse])
 def list_runs() -> list[RunResponse]:
     with get_session() as session:
         rows = RunRepository(session).list_all()
-        return [_to_response(r) for r in rows]
+        return [_to_response(r, _equity_for_row(session, r)) for r in rows]
 
 @router.post("", response_model=RunResponse)
 def create_run(req: CreateRunRequest) -> RunResponse:
@@ -87,7 +98,7 @@ def get_run(run_id: UUID) -> RunResponse:
         row = session.get(StrategyRunRow, run_id)
         if row is None:
             raise HTTPException(404, f"Run {run_id} not found")
-        return _to_response(row)
+        return _to_response(row, _equity_for_row(session, row))
 
 @router.get("/{run_id}/metrics", response_model=MetricsResponse)
 def get_metrics(run_id: UUID) -> MetricsResponse:

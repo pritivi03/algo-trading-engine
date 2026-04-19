@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {
       "/runs": apiTarget,
       "/strategies": apiTarget,
+      "/account": apiTarget,
     },
   },
 });

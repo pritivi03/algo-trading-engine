@@ -6,30 +6,23 @@ import { api } from "../api/client";
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 const DEFAULTS = {
-  symbol: "AAPL",
-  initial_capital: "100000",
-  start_date: "2021-07-01",
-  end_date: "2021-10-01",
+  symbol: "BTC/USD",
+  max_pos_size: "1",
+  max_notional_per_trade: "10000",
   strategy_params: JSON.stringify({ short_window: 5, long_window: 20 }, null, 2),
-  max_pos_size: "100",
-  max_notional_per_trade: "50000",
-  timeframe: "hour",
 };
 
-export default function NewSessionPage() {
+export default function NewLivePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const p = (key: string, fallback: string) => searchParams.get(key) ?? fallback;
 
+  const [paper, setPaper] = useState(p("paper", "true") !== "false");
   const [strategyId, setStrategyId] = useState(p("strategy_id", ""));
   const [symbol, setSymbol] = useState(p("symbol", DEFAULTS.symbol));
-  const [capital, setCapital] = useState(p("initial_capital", DEFAULTS.initial_capital));
-  const [startDate, setStartDate] = useState(p("start_date", DEFAULTS.start_date));
-  const [endDate, setEndDate] = useState(p("end_date", DEFAULTS.end_date));
-  const [strategyParams, setStrategyParams] = useState(p("strategy_params", DEFAULTS.strategy_params));
   const [maxPos, setMaxPos] = useState(p("max_pos_size", DEFAULTS.max_pos_size));
   const [maxNotional, setMaxNotional] = useState(p("max_notional_per_trade", DEFAULTS.max_notional_per_trade));
-  const [timeframe, setTimeframe] = useState(p("timeframe", DEFAULTS.timeframe));
+  const [strategyParams, setStrategyParams] = useState(p("strategy_params", DEFAULTS.strategy_params));
   const [paramsError, setParamsError] = useState("");
 
   const { data: strategies } = useQuery({
@@ -37,11 +30,18 @@ export default function NewSessionPage() {
     queryFn: api.strategies.list,
   });
 
+  const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useQuery({
+    queryKey: ["account-balance", paper],
+    queryFn: () => api.account.balance(paper),
+    retry: false,
+  });
+
   const selectedStrategy = strategies?.find((s) => s.id === strategyId);
   const selectedCode = selectedStrategy?.code ?? "# Select a strategy above to preview its code.";
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!balance) throw new Error("Could not fetch account balance");
       let params: Record<string, unknown>;
       try {
         params = JSON.parse(strategyParams);
@@ -51,19 +51,14 @@ export default function NewSessionPage() {
       const run = await api.runs.create({
         strategy_id: strategyId,
         symbol,
-        mode: "backtest",
-        initial_capital: Number(capital),
+        mode: paper ? "paper" : "live",
+        initial_capital: balance.portfolio_value,
         strategy_params: params,
         risk_config: {
           max_pos_size: Number(maxPos),
           max_notional_per_trade: Number(maxNotional),
         },
-        market_data_config: {
-          source: "historical",
-          start_date: `${startDate}T00:00:00`,
-          end_date: `${endDate}T00:00:00`,
-          timeframe,
-        },
+        market_data_config: { source: "live", timeframe: "minute" },
       });
       await api.runs.start(run.id);
       return run;
@@ -82,7 +77,34 @@ export default function NewSessionPage() {
         <button onClick={() => navigate("/sessions")} className="text-gray-500 hover:text-gray-300 text-sm">
           ← Sessions
         </button>
-        <h1 className="text-2xl font-semibold">New Backtest</h1>
+        <h1 className="text-2xl font-semibold">New Live Session</h1>
+      </div>
+
+      {/* Paper / Live toggle */}
+      <div className="flex items-center gap-3 mb-6 p-4 bg-gray-900 border border-gray-800 rounded-lg">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-200">Paper Trading</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {paper
+              ? "Simulated orders on real prices. Safe to experiment."
+              : "Real orders with real money. Be careful."}
+          </p>
+        </div>
+        <button
+          onClick={() => setPaper(!paper)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            paper ? "bg-yellow-500" : "bg-red-600"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              paper ? "translate-x-1" : "translate-x-6"
+            }`}
+          />
+        </button>
+        <span className={`text-xs font-mono font-semibold w-12 ${paper ? "text-yellow-400" : "text-red-400"}`}>
+          {paper ? "PAPER" : "LIVE"}
+        </span>
       </div>
 
       <div className="space-y-5">
@@ -107,39 +129,45 @@ export default function NewSessionPage() {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>Symbol</label>
-            <input className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="AAPL, BTC/USD…" />
-          </div>
-          <div>
-            <label className={labelCls}>Initial Capital ($)</label>
-            <input className={inputCls} value={capital} onChange={(e) => setCapital(e.target.value)} type="number" />
-          </div>
+        <div>
+          <label className={labelCls}>Symbol</label>
+          <input
+            className={inputCls}
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            placeholder="BTC/USD, ETH/USD, AAPL…"
+          />
+          <p className="text-xs text-gray-600 mt-1">Use BTC/USD format for crypto (24/7). Equity symbols use market hours.</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className={labelCls}>Start Date</label>
-            <input className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} type="date" />
+        {/* Account balance — fetched, read-only */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className={labelCls + " mb-0"}>Starting Capital (from Alpaca account)</label>
+            <button
+              onClick={() => refetchBalance()}
+              className="text-xs text-indigo-400 hover:text-indigo-300"
+            >
+              ↻ Refresh
+            </button>
           </div>
-          <div>
-            <label className={labelCls}>End Date</label>
-            <input className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} type="date" />
-          </div>
-          <div>
-            <label className={labelCls}>Timeframe</label>
-            <select className={inputCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
-              <option value="minute">Minute</option>
-              <option value="hour">Hour</option>
-              <option value="day">Day</option>
-            </select>
-          </div>
+          {balanceLoading ? (
+            <div className={`${inputCls} text-gray-500`}>Fetching from Alpaca…</div>
+          ) : balance ? (
+            <div className={`${inputCls} bg-gray-800/50 text-gray-300 flex items-center justify-between`}>
+              <span>${balance.portfolio_value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-xs text-gray-500">Cash: ${balance.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          ) : (
+            <div className={`${inputCls} text-red-400 text-xs`}>
+              Could not fetch balance. Check ALPACA_{paper ? "PAPER_" : ""}API_KEY env vars.
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Max Position Size (shares)</label>
+            <label className={labelCls}>Max Position Size (shares/units)</label>
             <input className={inputCls} value={maxPos} onChange={(e) => setMaxPos(e.target.value)} type="number" />
           </div>
           <div>
@@ -174,12 +202,26 @@ export default function NewSessionPage() {
 
         {paramsError && <p className="text-red-400 text-sm">{paramsError}</p>}
 
+        {!paper && (
+          <div className="p-3 bg-red-900/20 border border-red-800 rounded-md text-red-400 text-xs">
+            ⚠ Live mode places real orders with real money. Double-check your strategy and risk params before launching.
+          </div>
+        )}
+
         <button
           onClick={() => mutation.mutate()}
-          disabled={!strategyId || mutation.isPending}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors"
+          disabled={!strategyId || !balance || mutation.isPending}
+          className={`w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors ${
+            paper
+              ? "bg-yellow-600 hover:bg-yellow-500 text-white"
+              : "bg-red-700 hover:bg-red-600 text-white"
+          }`}
         >
-          {mutation.isPending ? "Launching…" : "Launch Backtest"}
+          {mutation.isPending
+            ? "Launching…"
+            : paper
+            ? "Start Paper Session"
+            : "Start Live Session"}
         </button>
       </div>
     </div>

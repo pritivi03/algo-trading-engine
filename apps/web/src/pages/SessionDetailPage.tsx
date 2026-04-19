@@ -55,8 +55,8 @@ export default function SessionDetailPage() {
     enabled: tab === "fills",
   });
 
-  const isPaper = run?.config.mode === "paper";
-  const isRunningPaper = isPaper && run?.status === "running";
+  const isLiveMode = run?.config.mode === "paper" || run?.config.mode === "live";
+  const isRunningPaper = isLiveMode && run?.status === "running";
 
   const { data: equitySnapshots } = useQuery({
     queryKey: ["equity", id],
@@ -70,18 +70,30 @@ export default function SessionDetailPage() {
   const cfg = run.config;
 
   function cloneRun() {
-    const params = new URLSearchParams({
-      strategy_id: cfg.strategy_id,
-      symbol: cfg.symbol,
-      initial_capital: String(cfg.initial_capital),
-      start_date: cfg.market_data_config.start_date.slice(0, 10),
-      end_date: cfg.market_data_config.end_date.slice(0, 10),
-      timeframe: cfg.market_data_config.timeframe ?? "hour",
-      strategy_params: JSON.stringify(cfg.strategy_params),
-      max_pos_size: String(cfg.risk_config.max_pos_size),
-      max_notional_per_trade: String(cfg.risk_config.max_notional_per_trade),
-    });
-    navigate(`/sessions/new?${params.toString()}`);
+    if (cfg.mode === "paper" || cfg.mode === "live") {
+      const params = new URLSearchParams({
+        strategy_id: cfg.strategy_id,
+        symbol: cfg.symbol,
+        paper: String(cfg.mode === "paper"),
+        strategy_params: JSON.stringify(cfg.strategy_params),
+        max_pos_size: String(cfg.risk_config.max_pos_size),
+        max_notional_per_trade: String(cfg.risk_config.max_notional_per_trade),
+      });
+      navigate(`/sessions/new/live?${params.toString()}`);
+    } else {
+      const params = new URLSearchParams({
+        strategy_id: cfg.strategy_id,
+        symbol: cfg.symbol,
+        initial_capital: String(cfg.initial_capital),
+        start_date: cfg.market_data_config.start_date?.slice(0, 10) ?? "",
+        end_date: cfg.market_data_config.end_date?.slice(0, 10) ?? "",
+        timeframe: cfg.market_data_config.timeframe ?? "hour",
+        strategy_params: JSON.stringify(cfg.strategy_params),
+        max_pos_size: String(cfg.risk_config.max_pos_size),
+        max_notional_per_trade: String(cfg.risk_config.max_notional_per_trade),
+      });
+      navigate(`/sessions/new?${params.toString()}`);
+    }
   }
   const pnlColor = (v: number) => v >= 0 ? "text-emerald-400" : "text-red-400";
 
@@ -115,8 +127,10 @@ export default function SessionDetailPage() {
           <span className="font-mono font-semibold text-gray-200">{cfg.symbol}</span>
           <span className="capitalize">{cfg.mode}</span>
           <span>${cfg.initial_capital.toLocaleString()}</span>
-          {cfg.mode === "paper" ? (
-            <span className="font-mono text-xs bg-yellow-900/40 border border-yellow-700 text-yellow-400 px-2 py-0.5 rounded">LIVE</span>
+          {cfg.mode === "live" ? (
+            <span className="font-mono text-xs bg-red-900/40 border border-red-700 text-red-400 px-2 py-0.5 rounded">LIVE</span>
+          ) : cfg.mode === "paper" ? (
+            <span className="font-mono text-xs bg-yellow-900/40 border border-yellow-700 text-yellow-400 px-2 py-0.5 rounded">PAPER</span>
           ) : (
             <>
               <span>{cfg.market_data_config.start_date?.slice(0, 10)} → {cfg.market_data_config.end_date?.slice(0, 10)}</span>
@@ -156,6 +170,21 @@ export default function SessionDetailPage() {
         <>
           {isRunningPaper ? (
             <div className="space-y-5">
+              {run.current_equity != null && (
+                <div className="grid grid-cols-3 gap-3">
+                  <MetricCard label="Current Equity" value={`$${run.current_equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                  <MetricCard
+                    label="Unrealized PnL"
+                    value={`${run.current_equity - run.config.initial_capital >= 0 ? "+" : ""}$${(run.current_equity - run.config.initial_capital).toFixed(2)}`}
+                    accent={pnlColor(run.current_equity - run.config.initial_capital)}
+                  />
+                  <MetricCard
+                    label="Return"
+                    value={`${run.current_equity - run.config.initial_capital >= 0 ? "+" : ""}${(((run.current_equity - run.config.initial_capital) / run.config.initial_capital) * 100).toFixed(2)}%`}
+                    accent={pnlColor(run.current_equity - run.config.initial_capital)}
+                  />
+                </div>
+              )}
               {equitySnapshots && equitySnapshots.length > 0 ? (
                 <EquityChart
                   data={equitySnapshots.map((s) => ({

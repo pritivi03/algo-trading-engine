@@ -2,7 +2,7 @@ import queue
 import threading
 from collections.abc import Iterator
 
-from alpaca.data.live import StockDataStream
+from alpaca.data.live import CryptoDataStream, StockDataStream
 from alpaca.data.models import Bar
 
 from credentials.credential_store import CredentialStore
@@ -10,6 +10,7 @@ from trading.core.config import RunConfig
 from trading.core.enums import RunMode
 from trading.core.events import MarketEvent
 from trading.market_data.base import BaseMarketDataAdapter
+from trading.market_data.historical import is_crypto
 
 
 class LiveMarketDataAdapter(BaseMarketDataAdapter):
@@ -30,10 +31,16 @@ class LiveMarketDataAdapter(BaseMarketDataAdapter):
         stop_event = threading.Event()
         self._stop_event = stop_event
 
-        wss = StockDataStream(
-            api_key=self._creds.ALPACA_API_KEY,
-            secret_key=self._creds.ALPACA_SECRET_KEY,
-        )
+        if is_crypto(symbol):
+            wss = CryptoDataStream(
+                api_key=self._creds.ALPACA_API_KEY,
+                secret_key=self._creds.ALPACA_SECRET_KEY,
+            )
+        else:
+            wss = StockDataStream(
+                api_key=self._creds.ALPACA_API_KEY,
+                secret_key=self._creds.ALPACA_SECRET_KEY,
+            )
 
         async def on_bar(bar: Bar) -> None:
             bar_queue.put_nowait(bar)

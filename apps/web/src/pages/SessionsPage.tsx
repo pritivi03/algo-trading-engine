@@ -9,6 +9,25 @@ function fmt(dt: string | null) {
   return new Date(dt).toLocaleString();
 }
 
+function PnlCell({ run }: { run: Run }) {
+  if (run.current_equity == null) return <span className="text-gray-600">—</span>;
+  const pnl = run.current_equity - run.config.initial_capital;
+  const pct = (pnl / run.config.initial_capital) * 100;
+  const color = pnl >= 0 ? "text-green-400" : "text-red-400";
+  const sign = pnl >= 0 ? "+" : "";
+  return (
+    <span className={`font-mono text-xs ${color}`}>
+      {sign}{pct.toFixed(2)}%
+    </span>
+  );
+}
+
+function ModeBadge({ mode }: { mode: string }) {
+  if (mode === "live") return <span className="text-xs font-mono bg-red-900/40 border border-red-700 text-red-400 px-2 py-0.5 rounded">LIVE</span>;
+  if (mode === "paper") return <span className="text-xs font-mono bg-yellow-900/40 border border-yellow-700 text-yellow-400 px-2 py-0.5 rounded">PAPER</span>;
+  return <span className="text-xs font-mono bg-gray-800 text-gray-500 px-2 py-0.5 rounded">BACKTEST</span>;
+}
+
 function DeleteButton({ run, strategyMap }: { run: Run; strategyMap: Map<string, Strategy> }) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
@@ -53,12 +72,20 @@ export default function SessionsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Sessions</h1>
-        <button
-          onClick={() => navigate("/sessions/new")}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-sm font-medium transition-colors"
-        >
-          + Launch Backtest
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate("/sessions/new")}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-md text-sm font-medium transition-colors"
+          >
+            + Backtest
+          </button>
+          <button
+            onClick={() => navigate("/sessions/new/live")}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-sm font-medium transition-colors"
+          >
+            + Live Session
+          </button>
+        </div>
       </div>
 
       {isLoading && <p className="text-gray-500 text-sm">Loading…</p>}
@@ -77,6 +104,7 @@ export default function SessionsPage() {
                 <th className="px-4 py-3 text-left">Symbol</th>
                 <th className="px-4 py-3 text-left">Mode</th>
                 <th className="px-4 py-3 text-left">Capital</th>
+                <th className="px-4 py-3 text-left">PnL</th>
                 <th className="px-4 py-3 text-left">Created</th>
                 <th className="px-4 py-3 text-left">Completed</th>
                 <th className="px-4 py-3" />
@@ -96,8 +124,9 @@ export default function SessionsPage() {
                     {strategyMap.get(run.strategy_id)?.name ?? <span className="text-gray-600">—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono">{run.config.symbol}</td>
-                  <td className="px-4 py-3 capitalize text-gray-400">{run.config.mode}</td>
+                  <td className="px-4 py-3"><ModeBadge mode={run.config.mode} /></td>
                   <td className="px-4 py-3">${run.config.initial_capital.toLocaleString()}</td>
+                  <td className="px-4 py-3"><PnlCell run={run} /></td>
                   <td className="px-4 py-3 text-gray-400">{fmt(run.created_at)}</td>
                   <td className="px-4 py-3 text-gray-400">{fmt(run.completed_at)}</td>
                   <td className="px-4 py-3 text-right">

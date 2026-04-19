@@ -28,6 +28,7 @@ class RunResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+    current_equity: float | None = None
 
 
 class MetricsResponse(BaseModel):

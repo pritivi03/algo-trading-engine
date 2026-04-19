@@ -19,11 +19,13 @@ class AlpacaExecutionAdapter(BaseExecutionAdapter):
         return []  # fills come back synchronously from submit_order
 
     def submit_order(self, order: OrderEvent) -> list[FillEvent]:
+        # crypto markets are 24/7 — GTC; equities use DAY
+        tif = TimeInForce.GTC if "/" in order.symbol else TimeInForce.DAY
         req = MarketOrderRequest(
             symbol=order.symbol,
             qty=order.qty,
             side=OrderSide.BUY if order.side == Side.BUY else OrderSide.SELL,
-            time_in_force=TimeInForce.DAY,
+            time_in_force=tif,
         )
         result = self._client.submit_order(order_data=req)
         filled = self._wait_for_fill(str(result.id))

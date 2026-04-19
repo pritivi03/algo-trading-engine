@@ -1,4 +1,4 @@
-import type { Strategy, Run, Metrics, Fill, EquitySnapshot, CreateRunPayload } from "./types";
+import type { Strategy, Run, Metrics, Fill, EquitySnapshot, CreateRunPayload, AccountBalance } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -38,5 +38,8 @@ export const api = {
     metrics: (id: string) => request<Metrics>(`/runs/${id}/metrics`),
     fills: (id: string) => request<Fill[]>(`/runs/${id}/fills`),
     equitySnapshots: (id: string) => request<EquitySnapshot[]>(`/runs/${id}/equity-snapshots`),
+  },
+  account: {
+    balance: (paper: boolean) => request<AccountBalance>(`/account/balance?paper=${paper}`),
   },
 };
