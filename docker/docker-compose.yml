@@ -26,5 +26,12 @@ services:
     depends_on:
       - db
 
+  runtime:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.runtime
+    image: algo-trading-runtime:latest
+    profiles: ["runtime"]   # build-only: never auto-started by `docker compose up`. Containers are spawned on-demand by the control plane (one per run).
+
 volumes:
   postgres_data:

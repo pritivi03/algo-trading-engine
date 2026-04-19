@@ -19,6 +19,12 @@ class StrategyRepository:
             raise ValueError(f"Strategy {strategy_id} not found")
         return row
 
+    def get_by_name(self, name: str) -> StrategyRow:
+        row = self.session.query(StrategyRow).filter(StrategyRow.name == name).one_or_none()
+        if row is None:
+            raise ValueError(f"Strategy with name {name!r} not found")
+        return row
+
     def list_all(self) -> list[StrategyRow]:
         return self.session.query(StrategyRow).all()
 
@@ -26,6 +32,9 @@ class StrategyRepository:
         row = StrategyRow(id=strategy_id, name=name, code=code)
         self.session.add(row)
         return row
+
+    def upsert(self, strategy_id: UUID, name: str, code: str) -> StrategyRow:
+        return self.session.merge(StrategyRow(id=strategy_id, name=name, code=code))
 
 
 class RunRepository:
@@ -58,10 +67,16 @@ class RunRepository:
         row.status = "completed"
         row.completed_at = datetime.now(timezone.utc)
 
-    def mark_failed(self, run_id: UUID) -> None:
+    def mark_failed(self, run_id: UUID, error_message: str | None = None) -> None:
         row = self.session.get(StrategyRunRow, run_id)
         row.status = "failed"
         row.completed_at = datetime.now(timezone.utc)
+        if error_message is not None:
+            row.error_message = error_message
+
+    def set_container_id(self, run_id: UUID, container_id: str) -> None:
+        row = self.session.get(StrategyRunRow, run_id)
+        row.container_id = container_id
 
 
 class FillRepository:

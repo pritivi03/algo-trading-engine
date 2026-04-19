@@ -1,51 +1,27 @@
 import os
-import uuid
-from datetime import date
+import traceback
+from uuid import UUID
 
 from dotenv import load_dotenv
 
 from apps.runtime.factory import build_engine
 from credentials.credential_store import CredentialStore
-from trading.core.config import RunConfig, RiskConfig, MarketDataConfig
-from trading.core.enums import RunMode, MarketDataSource
-from trading.persistence.db import get_session, init_db
-from trading.persistence.repositories import RunRepository, StrategyRepository, MetricsRepository
+from trading.persistence.db import get_session
+from trading.persistence.repositories import RunRepository, MetricsRepository
 
 load_dotenv()
 
 
 def main():
-    init_db()
-
-    strategy_id = uuid.uuid4()
-    run_id = uuid.uuid4()
-
-    config = RunConfig(
-        run_id=run_id,
-        strategy_id=strategy_id,
-        symbol="AAPL",
-        mode=RunMode.BACKTEST,
-        initial_capital=100_000,
-        strategy_params={"short_window": 10, "long_window": 50, "qty": 10},
-        risk_config=RiskConfig(max_pos_size=100, max_notional_per_trade=50_000),
-        market_data_config=MarketDataConfig(
-            source=MarketDataSource.HISTORICAL,
-            start_date=date(2024, 1, 1),
-            end_date=date(2024, 6, 1),
-        ),
-    )
+    run_id = UUID(os.environ["RUN_ID"])
 
     creds = CredentialStore(
         ALPACA_API_KEY=os.environ["ALPACA_API_KEY"],
         ALPACA_SECRET_KEY=os.environ["ALPACA_SECRET_KEY"],
     )
 
-    # seed strategy + run row so the FK + config_json exist
     with get_session() as session:
-        StrategyRepository(session).save(strategy_id, "moving_average_cross", "# seeded")
-        RunRepository(session).create(run_id, strategy_id, config)
-
-    with get_session() as session:
+        config = RunRepository(session).load_config(run_id)
         RunRepository(session).mark_started(run_id)
 
     try:
@@ -56,8 +32,9 @@ def main():
             MetricsRepository(session).save_metrics(run_id, metrics)
             RunRepository(session).mark_completed(run_id)
     except Exception:
+        error_text = traceback.format_exc()
         with get_session() as session:
-            RunRepository(session).mark_failed(run_id)
+            RunRepository(session).mark_failed(run_id, error_message=error_text)
         raise
 
     print(f"Run ID:              {run_id}")

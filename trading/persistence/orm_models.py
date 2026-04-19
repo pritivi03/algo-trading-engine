@@ -29,6 +29,8 @@ class StrategyRunRow(Base):
     strategy_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("strategies.id"), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending")  # pending | running | completed | failed
     config_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    container_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

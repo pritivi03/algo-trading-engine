@@ -5,8 +5,8 @@ COPY pyproject.toml uv.lock ./
 RUN pip install uv && uv sync --frozen
 
 COPY apps/__init__.py apps/__init__.py
-COPY apps/api apps/api
+COPY apps/runtime apps/runtime
 COPY trading trading
 COPY credentials credentials
 
-CMD ["uv", "run", "uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uv", "run", "python", "-m", "apps.runtime.runner"]

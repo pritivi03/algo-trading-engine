@@ -3,19 +3,23 @@ from trading.core.config import RunConfig
 from trading.core.enums import RunMode
 from trading.execution.simulated import SimulatedExecutionAdapter
 from trading.market_data.historical import HistoricalMarketDataAdapter
+from trading.persistence.db import get_session
+from trading.persistence.repositories import StrategyRepository
 from trading.risk.manager import RiskManager
 from trading.runtime.engine import TradingEngine
-from trading.strategies.seeds.moving_average import MovingAverageCrossStrategy
+from trading.strategies.base import BaseStrategy
+from trading.strategies.loader import load_strategy_from_code
+
+
+def _load_strategy(config: RunConfig) -> BaseStrategy:
+    with get_session() as session:
+        row = StrategyRepository(session).get(config.strategy_id)
+        code = row.code
+    return load_strategy_from_code(code, config.strategy_params)
 
 
 def build_engine(credential_store: CredentialStore, config: RunConfig) -> TradingEngine:
-    # TODO: resolve strategy_id from db and load dynamically
-    strategy = MovingAverageCrossStrategy(
-        short_window=config.strategy_params["short_window"],
-        long_window=config.strategy_params["long_window"],
-        qty=config.strategy_params.get("qty", 1),
-    )
-
+    strategy = _load_strategy(config)
     risk_manager = RiskManager(config.risk_config)
 
     if config.mode == RunMode.BACKTEST:
