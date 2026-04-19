@@ -2,7 +2,7 @@ from enum import Enum
 
 class RunMode(str, Enum):
     BACKTEST = 'backtest'
-    live = 'live'
+    LIVE = 'live'
 
 class Side(str, Enum):
     BUY = 'buy'
@@ -19,5 +19,5 @@ class OrderStatus(str, Enum):
     REJECTED = 'rejected'
 
 class MarketDataSource(str, Enum):
-    historical = 'historical'
-    live = 'live'
+    HISTORICAL = 'historical'
+    LIVE = 'live'

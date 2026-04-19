@@ -19,7 +19,7 @@ class MarketEvent(BaseEvent):
 class SignalEvent(BaseEvent):
     side: Side
     signal_price: float
-    qty: int | None = 1
+    qty: int = 1
 
 class OrderEvent(BaseEvent):
     order_id: UUID = Field(default_factory=uuid4)

@@ -47,7 +47,6 @@ class HistoricalMarketDataAdapter(BaseMarketDataAdapter):
 
         self.data_client = StockHistoricalDataClient(credential_store.ALPACA_API_KEY, credential_store.ALPACA_SECRET_KEY)
 
-    @property
     def stream(self) -> Iterator[MarketEvent]:
         symbol = self.run_config.symbol
         market_data_config = self.run_config.market_data_config

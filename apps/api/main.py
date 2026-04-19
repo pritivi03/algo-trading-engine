@@ -28,7 +28,7 @@ async def health():
         strategy_params={},
         risk_config=RiskConfig(max_pos_size=0, max_notional_per_trade=0),
         market_data_config=MarketDataConfig(
-            source=MarketDataSource.historical,
+            source=MarketDataSource.HISTORICAL,
             start_date=datetime.strptime("2021-07-01", "%Y-%m-%d"),
             end_date=datetime.strptime("2021-10-01", "%Y-%m-%d"),
         )
