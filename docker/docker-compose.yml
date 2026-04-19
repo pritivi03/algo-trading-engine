@@ -18,5 +18,13 @@ services:
     depends_on:
       - db
 
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
 volumes:
   postgres_data:

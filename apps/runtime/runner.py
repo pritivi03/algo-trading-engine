@@ -8,13 +8,21 @@ from apps.runtime.factory import build_engine
 from credentials.credential_store import CredentialStore
 from trading.core.config import RunConfig, RiskConfig, MarketDataConfig
 from trading.core.enums import RunMode, MarketDataSource
+from trading.persistence.db import get_session, init_db
+from trading.persistence.repositories import RunRepository, StrategyRepository, MetricsRepository
 
 load_dotenv()
 
+
 def main():
+    init_db()
+
+    strategy_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+
     config = RunConfig(
-        run_id=uuid.uuid4(),
-        strategy_id=uuid.uuid4(),
+        run_id=run_id,
+        strategy_id=strategy_id,
         symbol="AAPL",
         mode=RunMode.BACKTEST,
         initial_capital=100_000,
@@ -32,9 +40,27 @@ def main():
         ALPACA_SECRET_KEY=os.environ["ALPACA_SECRET_KEY"],
     )
 
-    engine = build_engine(creds, config)
-    final_state, metrics = engine.run()
+    # seed strategy + run row so the FK + config_json exist
+    with get_session() as session:
+        StrategyRepository(session).save(strategy_id, "moving_average_cross", "# seeded")
+        RunRepository(session).create(run_id, strategy_id, config)
 
+    with get_session() as session:
+        RunRepository(session).mark_started(run_id)
+
+    try:
+        engine = build_engine(creds, config)
+        final_state, metrics = engine.run()
+
+        with get_session() as session:
+            MetricsRepository(session).save_metrics(run_id, metrics)
+            RunRepository(session).mark_completed(run_id)
+    except Exception:
+        with get_session() as session:
+            RunRepository(session).mark_failed(run_id)
+        raise
+
+    print(f"Run ID:              {run_id}")
     print(f"Final cash:          ${final_state.cash:,.2f}")
     print(f"Final equity:        ${final_state.equity:,.2f}")
     print(f"Realized PnL:        ${final_state.realized_pnl:,.2f}")

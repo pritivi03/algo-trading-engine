@@ -2,11 +2,14 @@ from collections import deque
 from typing import Tuple
 
 from trading.core.config import RunConfig
+from trading.core.enums import RunMode
 from trading.core.events import OrderEvent, MarketEvent, SignalEvent, FillEvent
 from trading.core.models import PortfolioState
 from trading.execution.base import BaseExecutionAdapter
 from trading.market_data.base import BaseMarketDataAdapter
 from trading.metrics.engine import MetricsEngine, RunMetrics
+from trading.persistence.db import get_session
+from trading.persistence.repositories import FillRepository
 from trading.portfolio.tracker import PortfolioTracker
 from trading.risk.manager import RiskManager
 from trading.strategies.base import BaseStrategy
@@ -25,9 +28,21 @@ class TradingEngine:
         self.risk = risk
         self.portfolio = PortfolioTracker(config.initial_capital)
         self.metrics = MetricsEngine(config.initial_capital)
+        self.fills_buffer: list[FillEvent] = []  # only used in backtest mode
+
+    def _persist_fill_live(self, fill: FillEvent) -> None:
+        with get_session() as session:
+            FillRepository(session).save_fill(self.run_config.run_id, fill)
+
+    def _persist_fills_batch(self) -> None:
+        if not self.fills_buffer:
+            return
+        with get_session() as session:
+            FillRepository(session).save_fills_batch(self.run_config.run_id, self.fills_buffer)
 
     def run(self) -> Tuple[PortfolioState, RunMetrics]:
         queue: deque = deque()
+        is_backtest = self.run_config.mode == RunMode.BACKTEST
 
         for market_event in self.market_data.stream():
             self.portfolio.mark_to_market(market_event)
@@ -50,8 +65,15 @@ class TradingEngine:
                 elif isinstance(event, FillEvent):
                     fill_result = self.portfolio.apply_fill(event)
                     self.metrics.on_fill(event, fill_result)
+                    if is_backtest:
+                        self.fills_buffer.append(event)
+                    else:
+                        self._persist_fill_live(event)
 
             self.metrics.on_bar(self.portfolio.portfolio.equity)
+
+        if is_backtest:
+            self._persist_fills_batch()
 
         final_state = self.portfolio.snapshot()
         return final_state, self.metrics.summary(final_state.equity)
