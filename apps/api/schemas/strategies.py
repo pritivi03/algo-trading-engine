@@ -13,4 +13,5 @@ class StrategyResponse(BaseModel):
     id: UUID
     name: str
     code: str
+    default_params: dict
     created_at: datetime

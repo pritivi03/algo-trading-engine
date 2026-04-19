@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from trading.core.enums import Side
 from trading.core.events import SignalEvent, OrderEvent
 from trading.core.models import PortfolioState
 
@@ -18,7 +19,9 @@ class MaxPositionSizeRule(BaseRiskRule):
     def validate(self, order: OrderEvent, signal: SignalEvent, portfolio: PortfolioState) -> bool:
         position = portfolio.positions.get(order.symbol)
         current_qty = sum(lot.quantity for lot in position.lots) if position else 0
-        return (current_qty + order.qty) <= self.max_qty
+        if order.side == Side.BUY:
+            return (current_qty + order.qty) <= self.max_qty
+        return True  # sells reduce exposure — no cap needed
 
 
 class MaxNotionalPerTradeRule(BaseRiskRule):
@@ -32,5 +35,7 @@ class MaxNotionalPerTradeRule(BaseRiskRule):
 
 class SufficientCashRule(BaseRiskRule):
     def validate(self, order: OrderEvent, signal: SignalEvent, portfolio: PortfolioState) -> bool:
+        if order.side == Side.SELL:
+            return True  # selling generates cash — no check needed
         cost = signal.signal_price * order.qty
         return portfolio.cash >= cost

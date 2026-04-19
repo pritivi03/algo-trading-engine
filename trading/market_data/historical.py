@@ -60,12 +60,18 @@ class HistoricalMarketDataAdapter(BaseMarketDataAdapter):
         if market_data_config.end_date is None:
             raise RuntimeError("HistoricalMarketDataAdapter missing end_date in MarketDataConfig")
 
-        # load yfinance data for this symbol
+        _TIMEFRAME_MAP = {
+            "minute": TimeFrame(1, TimeFrameUnit.Minute),
+            "hour": TimeFrame(1, TimeFrameUnit.Hour),
+            "day": TimeFrame(1, TimeFrameUnit.Day),
+        }
+        tf = _TIMEFRAME_MAP.get(getattr(market_data_config, "timeframe", "minute"), TimeFrame(1, TimeFrameUnit.Minute))
+
         request_params = StockBarsRequest(
             symbol_or_symbols=symbol,
             start=datetime.combine(market_data_config.start_date, datetime.min.time()),
             end=datetime.combine(market_data_config.end_date, datetime.max.time()),
-            timeframe=TimeFrame(1, TimeFrameUnit.Minute),
+            timeframe=tf,
         )
         bar_set = self.data_client.get_stock_bars(request_params)
 

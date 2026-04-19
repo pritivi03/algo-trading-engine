@@ -4,6 +4,7 @@ export interface Strategy {
   id: string;
   name: string;
   code: string;
+  default_params: Record<string, unknown>;
   created_at: string;
 }
 
@@ -31,6 +32,7 @@ export interface RunConfig {
     source: string;
     start_date: string;
     end_date: string;
+    timeframe: string;
   };
 }
 
@@ -76,7 +78,8 @@ export interface CreateRunPayload {
   risk_config: { max_pos_size: number; max_notional_per_trade: number };
   market_data_config: {
     source: string;
-    start_date: string;
-    end_date: string;
+    start_date?: string;
+    end_date?: string;
+    timeframe?: string;
   };
 }

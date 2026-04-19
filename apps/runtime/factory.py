@@ -2,7 +2,9 @@ from credentials.credential_store import CredentialStore
 from trading.core.config import RunConfig
 from trading.core.enums import RunMode
 from trading.execution.simulated import SimulatedExecutionAdapter
+from trading.execution.alpaca import AlpacaExecutionAdapter
 from trading.market_data.historical import HistoricalMarketDataAdapter
+from trading.market_data.live import LiveMarketDataAdapter
 from trading.persistence.db import get_session
 from trading.persistence.repositories import StrategyRepository
 from trading.risk.manager import RiskManager
@@ -25,8 +27,13 @@ def build_engine(credential_store: CredentialStore, config: RunConfig) -> Tradin
     if config.mode == RunMode.BACKTEST:
         market_data = HistoricalMarketDataAdapter(credential_store, config)
         execution = SimulatedExecutionAdapter()
-    elif config.mode == RunMode.LIVE:
-        raise NotImplementedError("Live mode not yet supported")
+    elif config.mode in (RunMode.PAPER, RunMode.LIVE):
+        market_data = LiveMarketDataAdapter(credential_store, config)
+        execution = AlpacaExecutionAdapter(
+            api_key=credential_store.ALPACA_API_KEY,
+            secret_key=credential_store.ALPACA_SECRET_KEY,
+            paper=(config.mode == RunMode.PAPER),
+        )
     else:
         raise ValueError(f"Unknown run mode: {config.mode}")
 

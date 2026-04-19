@@ -19,6 +19,10 @@ export const api = {
   strategies: {
     list: () => request<Strategy[]>("/strategies"),
     get: (id: string) => request<Strategy>(`/strategies/${id}`),
+    create: (name: string, code: string) =>
+      request<Strategy>("/strategies", { method: "POST", body: JSON.stringify({ name, code }) }),
+    update: (id: string, name: string, code: string) =>
+      request<Strategy>(`/strategies/${id}`, { method: "PUT", body: JSON.stringify({ name, code }) }),
   },
   runs: {
     list: () => request<Run[]>("/runs"),

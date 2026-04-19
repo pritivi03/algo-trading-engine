@@ -1,5 +1,7 @@
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
+from typing import cast
 
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -7,12 +9,11 @@ from sqlalchemy.orm import sessionmaker, Session
 from trading.persistence.orm_models import Base
 
 _engine: Engine | None = None
-_SessionLocal: sessionmaker | None = None
-
+_SessionLocal: sessionmaker[Session] | None = None
 
 def _get_engine() -> Engine:
     global _engine, _SessionLocal
-    if _engine is None:
+    if _engine is None or _SessionLocal is None:
         url = os.environ.get("DATABASE_URL")
         if not url:
             raise RuntimeError(
@@ -22,6 +23,7 @@ def _get_engine() -> Engine:
             )
         _engine = create_engine(url)
         _SessionLocal = sessionmaker(bind=_engine)
+    assert _engine is not None
     return _engine
 
 
@@ -30,14 +32,10 @@ def init_db() -> None:
 
 
 @contextmanager
-def get_session() -> Session:
+def get_session() -> Generator[Session, None, None]:
     _get_engine()  # ensures _SessionLocal is initialized
-    session = _SessionLocal()
-    try:
+    if _SessionLocal is None:
+        raise RuntimeError("Session factory not initialized")
+    factory = cast(sessionmaker[Session], _SessionLocal)
+    with factory() as session, session.begin():
         yield session
-        session.commit()
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()

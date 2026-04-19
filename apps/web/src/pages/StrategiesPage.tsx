@@ -5,13 +5,22 @@ import { api } from "../api/client";
 export default function StrategiesPage() {
   const navigate = useNavigate();
   const { data: strategies, isLoading } = useQuery({
+
     queryKey: ["strategies"],
     queryFn: api.strategies.list,
   });
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-6">Strategies</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Strategies</h1>
+        <button
+          onClick={() => navigate("/strategies/new")}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-sm font-medium transition-colors"
+        >
+          + New Strategy
+        </button>
+      </div>
 
       {isLoading && <p className="text-gray-500 text-sm">Loading…</p>}
 

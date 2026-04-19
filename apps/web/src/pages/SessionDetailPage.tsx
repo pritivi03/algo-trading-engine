@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -55,15 +55,34 @@ export default function SessionDetailPage() {
     enabled: tab === "fills",
   });
 
+  const isPaper = run?.config.mode === "paper";
+  const isRunningPaper = isPaper && run?.status === "running";
+
   const { data: equitySnapshots } = useQuery({
     queryKey: ["equity", id],
     queryFn: () => api.runs.equitySnapshots(id!),
-    enabled: run?.status === "completed",
+    enabled: run?.status === "completed" || isRunningPaper,
+    refetchInterval: isRunningPaper ? 5000 : false,
   });
 
   if (!run) return <p className="text-gray-500 text-sm">Loading…</p>;
 
   const cfg = run.config;
+
+  function cloneRun() {
+    const params = new URLSearchParams({
+      strategy_id: cfg.strategy_id,
+      symbol: cfg.symbol,
+      initial_capital: String(cfg.initial_capital),
+      start_date: cfg.market_data_config.start_date.slice(0, 10),
+      end_date: cfg.market_data_config.end_date.slice(0, 10),
+      timeframe: cfg.market_data_config.timeframe ?? "hour",
+      strategy_params: JSON.stringify(cfg.strategy_params),
+      max_pos_size: String(cfg.risk_config.max_pos_size),
+      max_notional_per_trade: String(cfg.risk_config.max_notional_per_trade),
+    });
+    navigate(`/sessions/new?${params.toString()}`);
+  }
   const pnlColor = (v: number) => v >= 0 ? "text-emerald-400" : "text-red-400";
 
   return (
@@ -76,6 +95,12 @@ export default function SessionDetailPage() {
         <div className="flex items-center gap-3 mb-1">
           <span className="font-mono text-2xl font-semibold tracking-tight">{run.id}</span>
           <StatusBadge status={run.status as RunStatus} />
+          <button
+            onClick={cloneRun}
+            className="ml-auto text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-md text-gray-300 transition-colors"
+          >
+            Clone &amp; Edit
+          </button>
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
           {strategy && (
@@ -90,7 +115,14 @@ export default function SessionDetailPage() {
           <span className="font-mono font-semibold text-gray-200">{cfg.symbol}</span>
           <span className="capitalize">{cfg.mode}</span>
           <span>${cfg.initial_capital.toLocaleString()}</span>
-          <span>{cfg.market_data_config.start_date.slice(0, 10)} → {cfg.market_data_config.end_date.slice(0, 10)}</span>
+          {cfg.mode === "paper" ? (
+            <span className="font-mono text-xs bg-yellow-900/40 border border-yellow-700 text-yellow-400 px-2 py-0.5 rounded">LIVE</span>
+          ) : (
+            <>
+              <span>{cfg.market_data_config.start_date?.slice(0, 10)} → {cfg.market_data_config.end_date?.slice(0, 10)}</span>
+              <span className="capitalize font-mono text-xs bg-gray-800 px-2 py-0.5 rounded">{cfg.market_data_config.timeframe ?? "hour"}</span>
+            </>
+          )}
           <span className="font-mono text-xs bg-gray-800 px-2 py-0.5 rounded">{JSON.stringify(cfg.strategy_params)}</span>
         </div>
         <div className="flex items-center gap-4 text-xs text-gray-600 mt-1.5">
@@ -122,7 +154,26 @@ export default function SessionDetailPage() {
 
       {tab === "overview" && (
         <>
-          {run.status === "completed" && metrics ? (
+          {isRunningPaper ? (
+            <div className="space-y-5">
+              {equitySnapshots && equitySnapshots.length > 0 ? (
+                <EquityChart
+                  data={equitySnapshots.map((s) => ({
+                    t: new Date(s.timestamp).getTime(),
+                    equity: s.equity,
+                    cash: s.cash,
+                  }))}
+                  initialCapital={run.config.initial_capital}
+                />
+              ) : (
+                <div className="bg-gray-900 border border-gray-800 rounded-lg p-5 text-sm text-gray-400">
+                  <p className="font-medium text-gray-300 mb-1">Waiting for first bar…</p>
+                  <p className="text-xs text-gray-500">Alpaca streams bars during market hours only (Mon–Fri, 9:30am–4:00pm ET). If markets are closed, bars will arrive at the next open.</p>
+                </div>
+              )}
+              <StopButton runId={id!} />
+            </div>
+          ) : run.status === "completed" && metrics ? (
             <div className="space-y-5">
               {equitySnapshots && equitySnapshots.length > 0 && (
                 <EquityChart
@@ -225,6 +276,23 @@ export default function SessionDetailPage() {
   );
 }
 
+function StopButton({ runId }: { runId: string }) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => api.runs.stop(runId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["run", runId] }),
+  });
+  return (
+    <button
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+      className="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 rounded-md text-sm font-medium transition-colors"
+    >
+      {mutation.isPending ? "Stopping…" : "Stop Paper Session"}
+    </button>
+  );
+}
+
 function EquityChart({
   data,
   initialCapital,
@@ -271,6 +339,10 @@ function EquityChart({
             tickLine={false}
             axisLine={false}
             width={80}
+            domain={([min, max]: [number, number]) => {
+              const padding = (max - min) * 0.1 || initialCapital * 0.001;
+              return [Math.floor(min - padding), Math.ceil(max + padding)];
+            }}
           />
           <Tooltip
             contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: 6 }}

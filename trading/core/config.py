@@ -17,6 +17,7 @@ class MarketDataConfig(BaseModel):
     source: MarketDataSource
     start_date: date | None = None
     end_date: date | None = None
+    timeframe: str = "minute"  # minute | hour | day
 
 class RunConfig(BaseModel):
     run_id: UUID

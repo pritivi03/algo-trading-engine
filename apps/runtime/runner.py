@@ -1,4 +1,5 @@
 import os
+import signal
 import traceback
 from uuid import UUID
 
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 
 from apps.runtime.factory import build_engine
 from credentials.credential_store import CredentialStore
+from trading.core.enums import RunMode
 from trading.persistence.db import get_session
 from trading.persistence.repositories import RunRepository, MetricsRepository, EquitySnapshotRepository
 
@@ -24,14 +26,24 @@ def main():
         config = RunRepository(session).load_config(run_id)
         RunRepository(session).mark_started(run_id)
 
+    engine = build_engine(creds, config)
+    is_live = config.mode in (RunMode.PAPER, RunMode.LIVE)
+
+    if is_live:
+        def _sigterm_handler(signum, frame):
+            engine.market_data.signal_stop()
+
+        signal.signal(signal.SIGTERM, _sigterm_handler)
+
     try:
-        engine = build_engine(creds, config)
         final_state, metrics, snapshots = engine.run()
 
         with get_session() as session:
             MetricsRepository(session).save_metrics(run_id, metrics, final_state)
-            EquitySnapshotRepository(session).save_batch(run_id, snapshots)
+            if not is_live:
+                EquitySnapshotRepository(session).save_batch(run_id, snapshots)
             RunRepository(session).mark_completed(run_id)
+
     except Exception:
         error_text = traceback.format_exc()
         with get_session() as session:

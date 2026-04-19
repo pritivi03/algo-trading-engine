@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "../api/client";
 
@@ -13,18 +13,25 @@ const DEFAULTS = {
   strategy_params: JSON.stringify({ short_window: 5, long_window: 20 }, null, 2),
   max_pos_size: "100",
   max_notional_per_trade: "50000",
+  timeframe: "hour",
 };
 
 export default function NewSessionPage() {
   const navigate = useNavigate();
-  const [strategyId, setStrategyId] = useState("");
-  const [symbol, setSymbol] = useState(DEFAULTS.symbol);
-  const [capital, setCapital] = useState(DEFAULTS.initial_capital);
-  const [startDate, setStartDate] = useState(DEFAULTS.start_date);
-  const [endDate, setEndDate] = useState(DEFAULTS.end_date);
-  const [strategyParams, setStrategyParams] = useState(DEFAULTS.strategy_params);
-  const [maxPos, setMaxPos] = useState(DEFAULTS.max_pos_size);
-  const [maxNotional, setMaxNotional] = useState(DEFAULTS.max_notional_per_trade);
+  const [searchParams] = useSearchParams();
+
+  const p = (key: string, fallback: string) => searchParams.get(key) ?? fallback;
+
+  const [mode, setMode] = useState<"backtest" | "paper">(p("mode", "backtest") as "backtest" | "paper");
+  const [strategyId, setStrategyId] = useState(p("strategy_id", ""));
+  const [symbol, setSymbol] = useState(p("symbol", DEFAULTS.symbol));
+  const [capital, setCapital] = useState(p("initial_capital", DEFAULTS.initial_capital));
+  const [startDate, setStartDate] = useState(p("start_date", DEFAULTS.start_date));
+  const [endDate, setEndDate] = useState(p("end_date", DEFAULTS.end_date));
+  const [strategyParams, setStrategyParams] = useState(p("strategy_params", DEFAULTS.strategy_params));
+  const [maxPos, setMaxPos] = useState(p("max_pos_size", DEFAULTS.max_pos_size));
+  const [maxNotional, setMaxNotional] = useState(p("max_notional_per_trade", DEFAULTS.max_notional_per_trade));
+  const [timeframe, setTimeframe] = useState(p("timeframe", DEFAULTS.timeframe));
   const [paramsError, setParamsError] = useState("");
 
   const { data: strategies } = useQuery({
@@ -32,9 +39,8 @@ export default function NewSessionPage() {
     queryFn: api.strategies.list,
   });
 
-  const selectedCode =
-    strategies?.find((s) => s.id === strategyId)?.code ??
-    "# Select a strategy above to preview its code.";
+  const selectedStrategy = strategies?.find((s) => s.id === strategyId);
+  const selectedCode = selectedStrategy?.code ?? "# Select a strategy above to preview its code.";
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -47,18 +53,21 @@ export default function NewSessionPage() {
       const run = await api.runs.create({
         strategy_id: strategyId,
         symbol,
-        mode: "backtest",
+        mode,
         initial_capital: Number(capital),
         strategy_params: params,
         risk_config: {
           max_pos_size: Number(maxPos),
           max_notional_per_trade: Number(maxNotional),
         },
-        market_data_config: {
-          source: "historical",
-          start_date: `${startDate}T00:00:00`,
-          end_date: `${endDate}T00:00:00`,
-        },
+        market_data_config: mode === "paper"
+          ? { source: "live", timeframe: "minute" }
+          : {
+              source: "historical",
+              start_date: `${startDate}T00:00:00`,
+              end_date: `${endDate}T00:00:00`,
+              timeframe,
+            },
       });
       await api.runs.start(run.id);
       return run;
@@ -80,7 +89,23 @@ export default function NewSessionPage() {
         >
           ← Sessions
         </button>
-        <h1 className="text-2xl font-semibold">Launch Backtest</h1>
+        <h1 className="text-2xl font-semibold">{mode === "paper" ? "Paper Trading" : "Launch Backtest"}</h1>
+      </div>
+
+      <div className="flex gap-2 mb-5">
+        {(["backtest", "paper"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
+              mode === m
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-800 text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            {m === "paper" ? "Paper Trading" : "Backtest"}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-5">
@@ -88,7 +113,14 @@ export default function NewSessionPage() {
           <label className={labelCls}>Strategy</label>
           <select
             value={strategyId}
-            onChange={(e) => setStrategyId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setStrategyId(id);
+              const strat = strategies?.find((s) => s.id === id);
+              if (strat && Object.keys(strat.default_params).length > 0) {
+                setStrategyParams(JSON.stringify(strat.default_params, null, 2));
+              }
+            }}
             className={inputCls}
           >
             <option value="">Select a strategy…</option>
@@ -111,16 +143,30 @@ export default function NewSessionPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>Start Date</label>
-            <input className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} type="date" />
+        {mode === "backtest" ? (
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className={labelCls}>Start Date</label>
+              <input className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} type="date" />
+            </div>
+            <div>
+              <label className={labelCls}>End Date</label>
+              <input className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} type="date" />
+            </div>
+            <div>
+              <label className={labelCls}>Timeframe</label>
+              <select className={inputCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+                <option value="minute">Minute</option>
+                <option value="hour">Hour</option>
+                <option value="day">Day</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className={labelCls}>End Date</label>
-            <input className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} type="date" />
-          </div>
-        </div>
+        ) : (
+          <p className="text-xs text-gray-500 bg-gray-900 border border-gray-800 rounded-md px-3 py-2">
+            Paper trading streams live Alpaca minute bars in real time. No date range required.
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -166,7 +212,7 @@ export default function NewSessionPage() {
           disabled={!strategyId || mutation.isPending}
           className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors"
         >
-          {mutation.isPending ? "Launching…" : "Launch Backtest"}
+          {mutation.isPending ? "Launching…" : mode === "paper" ? "Start Paper Trading" : "Launch Backtest"}
         </button>
       </div>
     </div>

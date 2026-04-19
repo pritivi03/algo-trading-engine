@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import SessionsPage from "./pages/SessionsPage";
 import StrategiesPage from "./pages/StrategiesPage";
 import StrategyDetailPage from "./pages/StrategyDetailPage";
+import NewStrategyPage from "./pages/NewStrategyPage";
 import NewSessionPage from "./pages/NewSessionPage";
 import SessionDetailPage from "./pages/SessionDetailPage";
 
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/sessions/new" element={<NewSessionPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/strategies" element={<StrategiesPage />} />
+        <Route path="/strategies/new" element={<NewStrategyPage />} />
         <Route path="/strategies/:id" element={<StrategyDetailPage />} />
       </Routes>
     </Layout>

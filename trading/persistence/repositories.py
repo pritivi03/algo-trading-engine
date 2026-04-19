@@ -37,6 +37,12 @@ class StrategyRepository:
     def upsert(self, strategy_id: UUID, name: str, code: str) -> StrategyRow:
         return self.session.merge(StrategyRow(id=strategy_id, name=name, code=code))
 
+    def update(self, strategy_id: UUID, name: str, code: str) -> StrategyRow:
+        row = self.get(strategy_id)
+        row.name = name
+        row.code = code
+        return row
+
 
 class RunRepository:
     def __init__(self, session: Session):
@@ -89,6 +95,7 @@ class RunRepository:
     def delete(self, run_id: UUID) -> None:
         self.session.query(RunMetricsRow).filter(RunMetricsRow.run_id == run_id).delete()
         self.session.query(FillRow).filter(FillRow.run_id == run_id).delete()
+        self.session.query(EquitySnapshotRow).filter(EquitySnapshotRow.run_id == run_id).delete()
         row = self.session.get(StrategyRunRow, run_id)
         if row:
             self.session.delete(row)
@@ -149,6 +156,9 @@ class MetricsRepository:
 class EquitySnapshotRepository:
     def __init__(self, session: Session):
         self.session = session
+
+    def save_one(self, run_id: UUID, timestamp: datetime, equity: float, cash: float) -> None:
+        self.session.add(EquitySnapshotRow(run_id=run_id, timestamp=timestamp, equity=equity, cash=cash))
 
     def save_batch(self, run_id: UUID, snapshots: list[tuple[datetime, float, float]]) -> None:
         self.session.add_all([

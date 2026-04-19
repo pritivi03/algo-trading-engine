@@ -119,8 +119,9 @@ def start_run(run_id: UUID) -> RunResponse:
             raise HTTPException(404, f"Run {run_id} not found")
         if row.status != "pending":
             raise HTTPException(409, f"Run is in status {row.status!r}, can only start a pending run")
+        run_mode = row.config_json.get("mode", "backtest")
 
-    container_id = launcher.launch_run(run_id)
+    container_id = launcher.launch_run(run_id, mode=run_mode)
 
     with get_session() as session:
         RunRepository(session).set_container_id(run_id, container_id)

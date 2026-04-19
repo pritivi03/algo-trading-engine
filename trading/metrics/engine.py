@@ -17,12 +17,17 @@ class RunMetrics:
     avg_loss: float
 
 
-class MetricsEngine:
-    # minute bars: 390 trading minutes/day * 252 trading days/year
-    ANNUALIZATION_FACTOR = math.sqrt(390 * 252)
+_ANNUALIZATION_FACTORS = {
+    "minute": math.sqrt(390 * 252),
+    "hour": math.sqrt(int(6.5 * 252)),
+    "day": math.sqrt(252),
+}
 
-    def __init__(self, initial_equity: float):
+
+class MetricsEngine:
+    def __init__(self, initial_equity: float, timeframe: str = "minute"):
         self.initial_equity = initial_equity
+        self.ANNUALIZATION_FACTOR = _ANNUALIZATION_FACTORS.get(timeframe, _ANNUALIZATION_FACTORS["minute"])
 
         # drawdown tracking
         self.peak_equity = initial_equity

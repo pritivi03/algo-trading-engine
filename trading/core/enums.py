@@ -2,6 +2,7 @@ from enum import Enum
 
 class RunMode(str, Enum):
     BACKTEST = 'backtest'
+    PAPER = 'paper'
     LIVE = 'live'
 
 class Side(str, Enum):

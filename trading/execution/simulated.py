@@ -1,30 +1,43 @@
+from trading.core.enums import Side
 from trading.core.events import FillEvent, OrderEvent, MarketEvent
 from trading.execution.base import BaseExecutionAdapter
+
+SLIPPAGE_BPS = 2.0   # 2 basis points per side
+FEE_RATE = 0.0005    # 0.05% of notional per fill
 
 
 class SimulatedExecutionAdapter(BaseExecutionAdapter):
     def __init__(self):
-        self.last_event: MarketEvent | None = None
+        self._pending_orders: list[OrderEvent] = []
 
-    def on_market_event(self, event: MarketEvent) -> None:
-        self.last_event = event
+    def on_market_event(self, event: MarketEvent) -> list[FillEvent]:
+        if not self._pending_orders:
+            return []
+
+        fills = []
+        for order in self._pending_orders:
+            slippage = event.open * (SLIPPAGE_BPS / 10_000)
+            if order.side == Side.BUY:
+                fill_price = event.open + slippage
+            else:
+                fill_price = event.open - slippage
+
+            fills.append(FillEvent(
+                order_id=order.order_id,
+                timestamp=event.timestamp,
+                symbol=event.symbol,
+                side=order.side,
+                fill_price=fill_price,
+                qty=order.qty,
+                fees=round(fill_price * order.qty * FEE_RATE, 4),
+            ))
+
+        self._pending_orders = []
+        return fills
 
     def submit_order(self, order: OrderEvent) -> list[FillEvent]:
-        if self.last_event is None:
-            raise RuntimeError("SimulatedExecutionAdapter - no market event to simulate fill")
+        self._pending_orders.append(order)
+        return []
 
-        simulated_fill_event = FillEvent(
-            order_id=order.order_id,
-            timestamp=self.last_event.timestamp,
-            symbol=self.last_event.symbol,
-            side=order.side,
-            fill_price=self.last_event.close,
-            qty=order.qty,
-            fees=0
-        )
-
-        return [simulated_fill_event]
-
-    # Only used for live mode
     def sync(self) -> list[FillEvent]:
         return []
