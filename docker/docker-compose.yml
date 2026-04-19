@@ -13,8 +13,14 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.api
     env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql://algo:secret@db:5432/algo_trading
+      RUNTIME_DATABASE_URL: postgresql://algo:secret@db:5432/algo_trading
+      RUNTIME_NETWORK: docker_default
     ports:
       - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - db
 
