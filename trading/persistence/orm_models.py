@@ -61,4 +61,8 @@ class RunMetricsRow(Base):
     total_trades: Mapped[int] = mapped_column(Integer, nullable=False)
     avg_win: Mapped[float] = mapped_column(Float, nullable=False)
     avg_loss: Mapped[float] = mapped_column(Float, nullable=False)
+    final_cash: Mapped[float | None] = mapped_column(Float, nullable=True)
+    final_equity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    realized_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    unrealized_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

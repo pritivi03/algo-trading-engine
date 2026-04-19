@@ -12,4 +12,5 @@ class CreateStrategyRequest(BaseModel):
 class StrategyResponse(BaseModel):
     id: UUID
     name: str
+    code: str
     created_at: datetime

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from trading.core.config import RunConfig
 from trading.core.events import FillEvent
+from trading.core.models import PortfolioState
 from trading.metrics.engine import RunMetrics
 from trading.persistence.orm_models import StrategyRunRow, FillRow, RunMetricsRow, StrategyRow
 
@@ -78,6 +79,20 @@ class RunRepository:
         row = self.session.get(StrategyRunRow, run_id)
         row.container_id = container_id
 
+    def list_all(self) -> list[StrategyRunRow]:
+        return (
+            self.session.query(StrategyRunRow)
+            .order_by(StrategyRunRow.created_at.desc())
+            .all()
+        )
+
+    def delete(self, run_id: UUID) -> None:
+        self.session.query(RunMetricsRow).filter(RunMetricsRow.run_id == run_id).delete()
+        self.session.query(FillRow).filter(FillRow.run_id == run_id).delete()
+        row = self.session.get(StrategyRunRow, run_id)
+        if row:
+            self.session.delete(row)
+
 
 class FillRepository:
     def __init__(self, session: Session):
@@ -110,7 +125,7 @@ class MetricsRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def save_metrics(self, run_id: UUID, metrics: RunMetrics) -> None:
+    def save_metrics(self, run_id: UUID, metrics: RunMetrics, final_state: PortfolioState) -> None:
         row = RunMetricsRow(
             run_id=run_id,
             total_return_pct=metrics.total_return_pct,
@@ -120,5 +135,12 @@ class MetricsRepository:
             total_trades=metrics.total_trades,
             avg_win=metrics.avg_win,
             avg_loss=metrics.avg_loss,
+            final_cash=final_state.cash,
+            final_equity=final_state.equity,
+            realized_pnl=final_state.realized_pnl,
+            unrealized_pnl=final_state.unrealized_pnl,
         )
         self.session.merge(row)
+
+    def get(self, run_id: UUID) -> RunMetricsRow | None:
+        return self.session.get(RunMetricsRow, run_id)

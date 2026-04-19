@@ -29,7 +29,7 @@ def main():
         final_state, metrics = engine.run()
 
         with get_session() as session:
-            MetricsRepository(session).save_metrics(run_id, metrics)
+            MetricsRepository(session).save_metrics(run_id, metrics, final_state)
             RunRepository(session).mark_completed(run_id)
     except Exception:
         error_text = traceback.format_exc()
