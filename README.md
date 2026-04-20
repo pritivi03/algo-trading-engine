@@ -8,13 +8,17 @@ Built to explore the systems design problems at the core of quantitative trading
 
 ## Dashboard
 
-> UI in progress — screenshots coming soon
+<img alt="Screen Recording 2026-04-19 at 6 42 29 PM" src="https://github.com/user-attachments/assets/b05f75b8-5242-458c-aa8e-83aba267654b" />
 
-| | | |
-|---|---|---|
-| ![Run list view](docs/screenshots/run-list.png) | ![Equity curve + metrics](docs/screenshots/equity-curve.png) | ![Strategy editor](docs/screenshots/strategy-editor.png) |
+<p align="center"><i>Event-driven backtesting engine with live equity curve, Sharpe ratio, max drawdown, and win rate — computed bar-by-bar</i></p>
 
-<p align="center"><i>Run list &nbsp;·&nbsp; Equity curve &amp; performance metrics &nbsp;·&nbsp; Strategy editor</i></p>
+<img width="1726" height="960" alt="Screenshot 2026-04-19 at 6 38 17 PM" src="https://github.com/user-attachments/assets/206c4e3f-6791-425d-85c1-0fe62349fb34" />
+
+<p align="center"><i>Monaco-powered strategy editor — write Python strategies that plug directly into the backtest and live trading engine</i></p>
+
+<img width="1726" height="960" alt="Screenshot 2026-04-19 at 6 48 27 PM" src="https://github.com/user-attachments/assets/cfad136b-f81d-4667-a647-a9e2d7912803" />
+
+<p align="center"><i>Paper and live trading via Alpaca — configurable position sizing, notional limits, and one-click deploy to an isolated Docker container with real-time equity tracking</i></p>
 
 ---
 
